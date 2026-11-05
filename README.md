@@ -1,5 +1,7 @@
 # work-utils
 
+[![CI](https://github.com/jeremiaaxel/work-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/jeremiaaxel/work-utils/actions/workflows/ci.yml)
+
 Personal web app for studying Japanese. Two tools:
 
 - **JP Reader** — photograph a Japanese page; OCR extracts the text with
