@@ -1,0 +1,61 @@
+[project]
+name = "work-utilities"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]",
+    "uvicorn[standard]",
+    "python-fasthtml>=0.12",
+    "python-multipart",
+    "httpx",
+    "pillow",
+    "pydantic-settings",
+    "deep-translator",
+    "taskiq[reload]>=0.11.0",
+    "taskiq-redis>=1.2.0,<2",
+    "redis>=5,<8",
+    "janome",
+    "fastlucide>=0.0.7",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pyright",
+    "pytest",
+    "fakeredis>=2.40.0",
+    "pytest-asyncio>=1.4.1",
+]
+
+# The OCR stack. Only the worker needs it — keeping it out of the base
+# dependencies makes the web image ~1.6 GB smaller. It is a default group so
+# a local `uv sync` still gets it, and the web image installs with
+# --no-default-groups to leave it out.
+#
+# opencv comes in with paddleocr[all] as opencv-contrib-python; listing
+# opencv-python-headless as well would install a second copy of the same
+# library for nothing.
+ocr = [
+    "paddlepaddle==3.2.0",
+    "paddleocr[all]>=3.7.0",
+    "paddlex[ocr]>=3.7.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+
+[tool.uv]
+# The local venv runs the worker too, so it gets the OCR stack by default.
+default-groups = ["dev", "ocr"]

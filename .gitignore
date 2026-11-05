@@ -1,0 +1,15 @@
+__pycache__/
+.venv/
+.env
+*.pyc
+output/
+.pyright/
+dist/
+*.egg-info/
+request-headers
+response-headers
+site-request-headers
+site-response
+.sesskey
+worktools-data/
+.claude/

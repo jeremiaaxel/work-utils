@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # One deploy at a time; a new push supersedes the one in flight.
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+permissions:
+  contents: read
+  # Needed to push the images to ghcr.io.
+  packages: write
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.17"
+
+      # The environment is the full one, OCR stack included: the type check
+      # has to be able to resolve numpy, cv2, paddleocr and paddlex, or it
+      # reports them as missing imports. The wheels are cached, so only the
+      # first run pays for the download.
+      - name: Cache the virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+          restore-keys: venv-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Tests
+        run: uv run pytest -q
+
+      - name: Lint
+        run: uvx ruff check .
+
+      - name: Types
+        run: uv run pyright app/
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      # The two images build in parallel; they share the base layers.
+      matrix:
+        target: [web, worker]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The heavy layers — the dependencies, the system packages and the OCR
+      # weights — are cached between runs, so a build only redoes what
+      # actually changed.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.target }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.target }}:latest
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+
+  deploy:
+    name: Deploy to the VPS
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Write the SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_KNOWN_HOSTS" ]; then
+            echo "::error::VPS_SSH_KEY and VPS_KNOWN_HOSTS both have to be set"
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      # The key is restricted on the server to this one command, so a leaked
+      # key can deploy and nothing else.
+      - name: Deploy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          if ! ssh -o BatchMode=yes -o IdentitiesOnly=yes \
+              "$VPS_USER@$VPS_HOST" /usr/local/bin/deploy-workutils; then
+            echo "::error::the deploy did not run. If the output above says 'No such file or directory' for /usr/local/bin/deploy-workutils, the script is not installed on the server yet — run 'sudo install -m 0755 scripts/server-deploy.sh /usr/local/bin/deploy-workutils' in the repo checkout. If it says 'Permission denied (publickey)', check that the PUBLIC key is in ~/$VPS_USER/.ssh/authorized_keys and that the VPS_SSH_KEY secret holds the PRIVATE key — the file without the .pub ending."
+            exit 1
+          fi

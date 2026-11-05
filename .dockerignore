@@ -1,0 +1,17 @@
+__pycache__/
+.venv/
+.env
+*.pyc
+output/
+.pyright/
+dist/
+*.egg-info/
+.git/
+.ruff_cache/
+.pytest_cache/
+worktools-data/
+.sesskey
+request-headers
+response-headers
+site-request-headers
+site-response

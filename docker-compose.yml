@@ -1,0 +1,143 @@
+# Log rotation for every service: an uncapped json-file log is the classic
+# silent disk-filler — a crashing container in a restart loop can fill a
+# disk in days. 10 MB x 3 files per service is plenty for diagnosis.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── Redis: task queue + progress store (shared by all) ──────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Production ───────────────────────────────────────────────────
+
+  web:
+    build:
+      context: .
+      target: web
+    # Built in CI and pushed to the registry; the server only pulls it.
+    image: ghcr.io/jeremiaaxel/work-utils-web:${IMAGE_TAG:-latest}
+    profiles: [production]
+    ports:
+      # Behind a reverse proxy (Caddy) set APP_BIND=127.0.0.1 so the app is
+      # only reachable through it. 0.0.0.0 exposes the app directly.
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./worktools-data:/tmp/worktools
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      target: worker
+    # Built in CI and pushed to the registry; the server only pulls it.
+    image: ghcr.io/jeremiaaxel/work-utils-worker:${IMAGE_TAG:-latest}
+    profiles: [production]
+    command: ["/app/.venv/bin/taskiq", "worker", "app.brokers.taskiq_broker:broker"]
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - TRANSLATION_CONCURRENCY=${TRANSLATION_CONCURRENCY:-1}
+      # PaddleOCR's inference allocates in bursts and glibc keeps it in the
+      # per-thread arenas. One shared arena trims the peak from ~2.3 GB to
+      # ~1.5 GB, which is what lets this fit in a small VPS.
+      - MALLOC_ARENA_MAX=1
+      - MALLOC_TRIM_THRESHOLD_=131072
+    volumes:
+      - ./worktools-data:/tmp/worktools
+      # No paddlex-models volume here on purpose: it would shadow the OCR
+      # weights baked into the image, so the worker would download them
+      # again at every start.
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Dev (hot reload + source mounts) ─────────────────────────────
+
+  dev:
+    build:
+      context: .
+      target: web-dev
+    profiles: [dev]
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+    # Include dev dependencies dynamically at launch, then run uvicorn.
+    # The web never imports paddle, so it is left out of this environment.
+    command: >
+      sh -c "uv sync --frozen --no-group ocr && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - ./worktools-data:/tmp/worktools
+      - ./app:/app/app
+      - /app/.venv # Protect container virtual environment from host machine overrides
+      - uv-cache:/root/.cache/uv  # keep downloaded wheels between restarts
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    restart: on-failure
+
+  dev-worker:
+    build:
+      context: .
+      target: worker-dev
+    profiles: [dev]
+    command: >
+      sh -c "uv sync --frozen --group ocr && uv run taskiq worker app.brokers.taskiq_broker:broker --reload --reload-dir /app/app"
+    env_file:
+      - .env
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - TRANSLATION_CONCURRENCY=${TRANSLATION_CONCURRENCY:-1}
+      # Keep .pyc files out of the mounted source tree — they would trigger
+      # the reload watcher on every import.
+      - PYTHONDONTWRITEBYTECODE=1
+      # Same arena tuning as production: keeps the OCR peak ~800 MB lower.
+      - MALLOC_ARENA_MAX=1
+      - MALLOC_TRIM_THRESHOLD_=131072
+    volumes:
+      - ./worktools-data:/tmp/worktools
+      - ./app:/app/app
+      - /app/.venv # Protect container virtual environment from host machine overrides
+      - uv-cache:/root/.cache/uv  # keep downloaded wheels between restarts
+      - paddlex-models:/root/.paddlex  # cached OCR weights, shared with production
+    depends_on:
+      redis:
+        condition: service_healthy
+    logging: *default-logging
+    restart: on-failure
+
+volumes:
+  worktools-data:
+  redis-data:
+  paddlex-models:
+  uv-cache:
+  
