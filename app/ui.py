@@ -8,6 +8,7 @@ from pathlib import Path
 from fasthtml.common import (
     A,
     Body,
+    Button,
     Div,
     Footer,
     Head,
@@ -24,7 +25,7 @@ from fasthtml.common import (
     Ul,
 )
 from fasthtml.components import FT
-from fastlucide.icons import spritesheet
+from fastlucide.icons import Sun_moon, spritesheet
 
 _APP_DIR = Path(__file__).parent
 
@@ -197,6 +198,19 @@ def page(active: str, *content, title: str | None = None) -> FT:
             Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
             Script(src="https://unpkg.com/htmx.org@1.9.12"),
             Style("rt { font-size: 0.5em; }"),
+            # Theme before first paint: the stored choice, else the OS
+            # preference. Inline so a dark-mode visitor never sees a white
+            # flash; theme.js only handles clicks after that.
+            NotStr(
+                "<script>"
+                "(function(){try{var t=localStorage.getItem('theme');"
+                "if(t!=='light'&&t!=='dark')?"
+                "t=matchMedia('(prefers-color-scheme: dark)').matches"
+                "? 'dark':'light':0;"
+                "if(t)document.documentElement.setAttribute('data-theme',t);}"
+                "catch(e){}})();"
+                "</script>"
+            ),
         ),
         Body(
             Div(
@@ -205,6 +219,14 @@ def page(active: str, *content, title: str | None = None) -> FT:
                     cls="flex-1",
                 ),
                 Div(_nav(active), cls="flex-none"),
+                Button(
+                    Sun_moon(sz=18),
+                    type="button",
+                    id="theme-toggle",
+                    title="Switch between light and dark",
+                    aria_label="Toggle dark mode",
+                    cls="btn btn-ghost btn-sm btn-square flex-none",
+                ),
                 cls="navbar bg-base-100 shadow-sm",
             ),
             Main(*content, cls="container mx-auto px-4 py-8 max-w-4xl"),
@@ -218,6 +240,7 @@ def page(active: str, *content, title: str | None = None) -> FT:
             ),
             update_banner(),
             Script(src=asset_url("/app.js")),
+            Script(src=asset_url("/theme.js")),
             # Every icon on the site is a fastlucide `<use>` pointing into this
             # sheet, so it has to be on every page — including the icons that
             # arrive later in a swapped-in fragment or are drawn by JavaScript.
@@ -225,5 +248,4 @@ def page(active: str, *content, title: str | None = None) -> FT:
             cls="min-h-screen",
         ),
         lang="en",
-        data_theme="light",
     )
