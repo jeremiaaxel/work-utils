@@ -33,7 +33,7 @@ from fasthtml.common import (
     Template,
     Tr,
 )
-from fastlucide.icons import Arrow_left, Copy, Crop, Scan, Trash_2, X, Zoom_in
+from fastlucide.icons import Arrow_left, Crop, Link, Scan, Trash_2, X, Zoom_in
 
 from app.core import jr_store
 from app.fh_app import rt
@@ -236,8 +236,8 @@ def _image_dialog():
     """
     return Dialog(
         Div(
-            Img(id="jr-zoom-img", cls="max-h-[85vh] max-w-full block"),
-            Div(id="jr-zoom-boxes", cls="absolute inset-0"),
+            # The close button on its own row above the picture, so it never
+            # covers the image's top-right corner.
             Form(
                 Button(
                     X(sz=20),
@@ -247,7 +247,14 @@ def _image_dialog():
                     cls="btn btn-sm btn-circle btn-ghost bg-base-100/80",
                 ),
                 method="dialog",
-                cls="absolute top-1 right-1 z-10",
+                cls="flex justify-end p-1",
+            ),
+            Div(
+                Img(id="jr-zoom-img", cls="max-h-[85vh] max-w-full block"),
+                Div(id="jr-zoom-boxes", cls="absolute inset-0"),
+                # Anchors the line boxes to the picture, not to the whole
+                # dialog — the button row above must not shift them.
+                cls="relative",
             ),
             # modal-box keeps the backdrop's click-to-close working; the
             # overrides take away its frame so the picture floats on the dim.
@@ -291,7 +298,7 @@ async def detail(record_id: str):
             ),
             H1("JP Reader", cls="text-2xl font-bold flex-1"),
             Button(
-                Copy(sz=18),
+                Link(sz=18),
                 type="button",
                 id="jr-copy",
                 cls="btn btn-ghost btn-sm btn-square",
