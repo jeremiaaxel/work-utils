@@ -183,11 +183,14 @@ def _nav(active: str) -> FT:
     return Ul(*links, cls="menu menu-horizontal px-1")
 
 
-def page(active: str, *content, title: str | None = None) -> FT:
+def page(active: str, *content, title: str | None = None, wide: bool = False) -> FT:
     """Full HTML page with DaisyUI + htmx.
 
     `active` is the page's registry key: it highlights the nav link and
-    picks the tab title. `title` overrides the registry tab title.
+    picks the tab title. `title` overrides the registry tab title. `wide`
+    lets a page use the desktop's full width — for layouts that put
+    primary and secondary content side by side; the default keeps the
+    reading column narrow.
     """
     return Html(
         Head(
@@ -229,7 +232,13 @@ def page(active: str, *content, title: str | None = None) -> FT:
                 ),
                 cls="navbar bg-base-100 shadow-sm",
             ),
-            Main(*content, cls="container mx-auto px-4 py-8 max-w-4xl"),
+            Main(
+                *content,
+                cls=(
+                    "container mx-auto px-4 py-8 max-w-4xl" if not wide
+                    else "container mx-auto px-4 py-8 max-w-7xl"
+                ),
+            ),
             Footer(
                 Small(
                     f"build {build_stamp()} · {build_time()}",
