@@ -332,6 +332,7 @@ async def detail(record_id: str):
         # Several pages open at once should be distinguishable by tab: the
         # first line of the read text names the tab until the read exists.
         title=_record_tab_title(record),
+        wide=True,
     )
 
 
@@ -365,7 +366,14 @@ async def fragment(record_id: str):
 
 
 def _detail_body(record: dict):
-    """The detail page's body — the page and the fragment share it."""
+    """The detail page's body — the page and the fragment share it.
+
+    Two zones. Primary: the original picture and the words of the line
+    that was tapped. Secondary: everything that supports the read —
+    the translated picture, the scan editor, the transcripts, the
+    timings — gathered on the right (below on a phone), collapsed where
+    possible, so the page never becomes one long scroll.
+    """
     regions = record.get("regions") or []
     width = record.get("width") or 1
     height = record.get("height") or 1
@@ -387,17 +395,22 @@ def _detail_body(record: dict):
 
     # Both frames are locked to the page's shape, so the original and the
     # translation stay level and the same size even before the translation
-    # exists.
-    frame = f"aspect-ratio:{width}/{height};"
+    # exists. Capping by width (not height) keeps the tappable line boxes
+    # — which are fractions of the frame — glued to the picture.
+    frame = (
+        f"aspect-ratio:{width}/{height};"
+        "max-width:min(100%, calc(70vh * "
+        f"{width / height:.4f}));"
+        "margin:auto;"
+    )
     # The images are cached, so each revision gets its own address.
     rev = f"?r={record.get('revision') or 0}"
 
     return Div(
-        # The learning view: the page as it is, and the page translated, side
-        # by side and level with each other.
+        # The left zone: the page as it is, and under it the words of
+        # whichever line was tapped — one eye-span for the tap-read loop.
         Div(
             Div(
-                P("Original — tap a line", cls="text-xs opacity-60 mb-1"),
                 Div(
                     Img(
                         id="jr-image",
@@ -411,73 +424,97 @@ def _detail_body(record: dict):
                     "bg-base-200",
                     style=frame,
                 ),
-                Button(
-                    Zoom_in(sz=14),
-                    "Enlarge",
-                    type="button",
-                    id="jr-zoom-original",
-                    cls="btn btn-xs btn-outline gap-1 mt-1",
-                ),
-                cls="min-w-0",
-            ),
-            Div(
-                P("Translated", cls="text-xs opacity-60 mb-1"),
                 Div(
-                    Span(
-                        "The translation is not ready yet.",
-                        cls="absolute inset-0 flex items-center justify-center "
-                        "p-4 text-center text-xs opacity-60",
+                    Button(
+                        Zoom_in(sz=14),
+                        "Enlarge",
+                        type="button",
+                        id="jr-zoom-original",
+                        cls="btn btn-xs btn-outline gap-1",
                     ),
-                    Img(
-                        id="jr-translated",
-                        src=f"/api/jp-reader/records/{record['id']}/translated{rev}",
-                        cls="relative w-full h-full block bg-base-200",
-                        alt="the page, translated",
-                        onerror="this.style.visibility='hidden'",
+                    # Learning focus: hide the painted translation without
+                    # touching the words panel — the reading loop stays whole.
+                    Label(
+                        Input(
+                            type="checkbox",
+                            id="jr-show-translated",
+                            cls="toggle toggle-sm",
+                            checked=True,
+                        ),
+                        Span("Show translated", cls="text-xs"),
+                        cls="flex items-center gap-1.5 cursor-pointer",
                     ),
-                    cls="relative rounded overflow-hidden border border-base-300 "
-                    "bg-base-200",
-                    style=frame,
-                ),
-                Button(
-                    Zoom_in(sz=14),
-                    "Enlarge",
-                    type="button",
-                    id="jr-zoom-translated",
-                    cls="btn btn-xs btn-outline gap-1 mt-1",
+                    cls="flex items-center justify-between gap-2 mt-1",
                 ),
                 cls="min-w-0",
             ),
-            cls="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4 items-start",
+            Div(_words(), cls="mt-4"),
+            cls="min-w-0",
         ),
-        # Improving the scan comes straight after the pictures it changes.
-        _tools(record),
-        # The words of the line that was tapped.
-        Div(_words(), cls="mt-4"),
-        # The reading, in full.
+        # The right zone: the supporting cast, stacked and collapsible.
         Div(
+            # The translated page — demoted to secondary by placement and
+            # hideable for learning, not by deletion from the DOM.
             Div(
-                H3("The page", cls="font-bold"),
-                Pre(
-                    record.get("text") or "(no text yet)",
-                    cls="text-xs whitespace-pre-wrap bg-base-100 p-3 rounded-box",
+                Div(
+                    P("Translated", cls="text-xs opacity-60 mb-1"),
+                    Div(
+                        Span(
+                            "The translation is not ready yet.",
+                            cls="absolute inset-0 flex items-center justify-center "
+                            "p-4 text-center text-xs opacity-60",
+                        ),
+                        Img(
+                            id="jr-translated",
+                            src=f"/api/jp-reader/records/{record['id']}/translated{rev}",
+                            cls="relative w-full h-full block bg-base-200",
+                            alt="the page, translated",
+                            onerror="this.style.visibility='hidden'",
+                        ),
+                        cls="relative rounded overflow-hidden border "
+                        "border-base-300 bg-base-200",
+                        style=frame,
+                    ),
+                    Button(
+                        Zoom_in(sz=14),
+                        "Enlarge",
+                        type="button",
+                        id="jr-zoom-translated",
+                        cls="btn btn-xs btn-outline gap-1 mt-1",
+                    ),
+                    cls="min-w-0",
                 ),
+                id="jr-translated-zone",
             ),
-            Div(
-                H3("The translation", cls="font-bold"),
-                Pre(
-                    record.get("translation") or "(not translated yet)",
-                    cls="text-xs whitespace-pre-wrap bg-base-100 p-3 rounded-box",
+            # Improving the scan comes below the pictures it changes.
+            _tools(record),
+            # The reading, in full, collapsed by default.
+            Details(
+                Summary("Transcript", cls="font-bold cursor-pointer"),
+                Div(
+                    Pre(
+                        record.get("text") or "(no text yet)",
+                        cls="text-xs whitespace-pre-wrap bg-base-100 p-3 rounded-box",
+                    ),
+                    Pre(
+                        record.get("translation") or "(not translated yet)",
+                        cls="text-xs whitespace-pre-wrap bg-base-100 p-3 "
+                        "rounded-box mt-2",
+                    ),
                 ),
+                cls="bg-base-100 rounded-box p-3 mt-4",
             ),
-            cls="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4",
+            # The inspection, under everything else.
+            Details(
+                Summary("Details", cls="font-bold cursor-pointer"),
+                _timings_table(record),
+                cls="bg-base-100 rounded-box p-3 mt-4",
+            ),
+            cls="min-w-0",
         ),
-        # The inspection, under everything else.
-        Details(
-            Summary("Details", cls="font-bold cursor-pointer"),
-            _timings_table(record),
-            cls="bg-base-100 rounded-box p-3 mt-4",
-        ),
+        # Side by side where there is room; the primary column dominates.
+        cls="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] "
+        "gap-6 items-start",
         id="jr-detail-body",
     )
 
