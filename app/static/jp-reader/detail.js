@@ -353,6 +353,34 @@
     modal.showModal();
   }
 
+  // ── learning focus ─────────────────────────────────────────────
+
+  // "Show translated" hides the painted translation on the right, so a
+  // study pass can ignore it; the words panel keeps its English answers.
+  // The choice is remembered per device and survives body refreshes.
+  var SHOW_KEY = "jr-show-translated";
+
+  function showTranslatedStored() {
+    try { return localStorage.getItem(SHOW_KEY) !== "off"; } catch (e) { return true; }
+  }
+
+  function applyTranslatedVisibility() {
+    var zone = $("jr-translated-zone");
+    if (zone) { zone.classList.toggle("hidden", !showTranslatedStored()); }
+    var toggle = $("jr-show-translated");
+    if (toggle) { toggle.checked = showTranslatedStored(); }
+  }
+
+  function wireTranslatedToggle() {
+    var toggle = $("jr-show-translated");
+    if (!toggle) { return; }
+    toggle.addEventListener("change", function () {
+      try { localStorage.setItem(SHOW_KEY, toggle.checked ? "on" : "off"); }
+      catch (e) { /* private mode: still applies for this visit */ }
+      applyTranslatedVisibility();
+    });
+  }
+
   // ── wiring up the server-rendered page ──────────────────────────
 
   function hydrate() {
@@ -375,6 +403,8 @@
 
     wireEditor();
     wireRegion();
+    wireTranslatedToggle();
+    applyTranslatedVisibility();
     renderChips(null);
     renderOrientation(record);
 
