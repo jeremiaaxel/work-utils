@@ -122,7 +122,22 @@ def index():
         P(
             "Understand Japanese and express yourself in it — both directions "
             "on one page, with furigana and pronunciation.",
-            cls="opacity-70 mb-6",
+            cls="opacity-70 mb-2",
+        ),
+        # Processing disclosure (manifest §5): state where the text actually
+        # goes — a remote provider — and that history is not kept. Never
+        # describe remote processing as local.
+        Div(
+            Span("ℹ️ ", cls="mr-1"),
+            Span("Processing: Remote translation provider"),
+            Span(" · "),
+            Span("History: Not saved"),
+            Span(
+                " — content lives in this page only; refreshing clears it.",
+                cls="opacity-70",
+            ),
+            cls="alert alert-info py-2 mb-6 text-sm",
+            role="note",
         ),
         # One password for both panels — translating spends a provider call.
         Label(
