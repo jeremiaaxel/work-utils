@@ -39,6 +39,7 @@ ocr = [
     "paddlepaddle==3.2.0",
     "paddleocr[all]>=3.7.0",
     "paddlex[ocr]>=3.7.2",
+    "pytesseract>=0.3.13",
 ]
 
 [tool.pytest.ini_options]

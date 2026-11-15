@@ -276,10 +276,10 @@ def test_the_cache_key_names_the_provider(monkeypatch):
     # Entries are keyed per provider, so a poisoned entry from one provider
     # ("12-hour clock") is never served by another, and switching providers
     # starts fresh instead of serving 30 days of the old one's answers.
-    from app.core import translation_cache
+    from app.core import runtime_settings, translation_cache
 
     key = translation_cache._key("en", "テスト")
     assert key.startswith("tr:en:google:")
 
-    monkeypatch.setattr(settings.translation, "primary", "deepl")
+    runtime_settings.set_values(translation_primary="deepl")
     assert translation_cache._key("en", "テスト") != key

@@ -15,6 +15,8 @@ from app.tools.jp_translator import (
     views as _jp_translator_views,  # noqa: F401 — registers routes
 )
 from app.tools.jp_translator.router import router as jp_translator_router
+from app.tools.settings import views as _settings_views  # noqa: F401 — registers routes
+from app.tools.settings.router import router as settings_router
 from app.ui import build_stamp
 
 logging.basicConfig(
@@ -51,6 +53,7 @@ async def robots() -> PlainTextResponse:
 # include_router, so this order lets /api/* win over FastHTML's catch-all.
 app.include_router(jp_reader_router)
 app.include_router(jp_translator_router)
+app.include_router(settings_router)
 
 # FastHTML pages mounted at root — handles /, /jp-reader/, /jp-translator/
 app.mount("/", fh_app)

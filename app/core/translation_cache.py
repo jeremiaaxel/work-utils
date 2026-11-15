@@ -15,7 +15,7 @@ import os
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from app.config import settings
+from app.core import runtime_settings
 
 if TYPE_CHECKING:
     import redis.asyncio as _redis
@@ -36,7 +36,8 @@ def _key(lang: str, text: str) -> str:
     `午前。\\n午後.`) needs no migration, just abandonment.
     """
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    return f"{_PREFIX}{lang}:{settings.translation.primary}:{digest}"
+    provider = runtime_settings.get_all()["translation_primary"]
+    return f"{_PREFIX}{lang}:{provider}:{digest}"
 
 
 async def _get_redis() -> _redis.Redis:

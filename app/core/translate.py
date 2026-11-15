@@ -19,7 +19,7 @@ from urllib.parse import quote
 import httpx
 from deep_translator import GoogleTranslator
 
-from app.config import settings
+from app.core import runtime_settings
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ def _deepl_translate(text: str, target_lang: str, source_lang: str) -> str:
     The lines go out as separate `text` fields of one request — DeepL answers
     one translation per field, so the line structure comes back intact.
     """
-    key = settings.translation.deepl_api_key
+    key = runtime_settings.get_all()["deepl_api_key"]
     if not key:
         raise RuntimeError("TRANSLATION_DEEPL_API_KEY is not set")
     host = "api-free.deepl.com" if key.endswith(":fx") else "api.deepl.com"
@@ -89,7 +89,7 @@ def _deepl_translate(text: str, target_lang: str, source_lang: str) -> str:
 def _lingva_translate(text: str, target_lang: str, source_lang: str) -> str:
     """A self-hosted Lingva instance — Google's translations without the
     client-side scrape, one hop removed. Needs TRANSLATION_LINGVA_URL."""
-    base = settings.translation.lingva_url.rstrip("/")
+    base = runtime_settings.get_all()["lingva_url"].rstrip("/")
     if not base:
         raise RuntimeError("TRANSLATION_LINGVA_URL is not set")
     response = httpx.get(
@@ -180,7 +180,8 @@ def translate_text(
 
     Blocking — call from a thread when running inside an async request handler.
     """
-    primary = settings.translation.primary
+    runtime = runtime_settings.get_all()
+    primary = runtime["translation_primary"]
     primary_error: Exception | None = None
     if primary and time.monotonic() >= _blocked_until.get(primary, 0.0):
         try:
@@ -196,7 +197,7 @@ def translate_text(
             )
             _blocked_until[primary] = time.monotonic() + _BLOCK_SECONDS
 
-    fallback = settings.translation.fallback
+    fallback = runtime["translation_fallback"]
     if fallback and fallback != primary:
         try:
             return (

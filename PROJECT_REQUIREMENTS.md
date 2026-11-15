@@ -25,9 +25,10 @@ app/
 ├── views.py                 # home page
 ├── config.py                # pydantic-settings, per-prefix sections
 ├── core/                    # shared services, tool-agnostic
-│   ├── ocr.py               # PaddleOCR wrapper (text detection + recognition)
+│   ├── ocr.py               # engine registry: paddle (default) / tesseract
 │   ├── japanese.py          # furigana tokenization (pykakasi-based)
 │   ├── translate.py         # provider registry: google/deepl/lingva/mymemory
+│   ├── runtime_settings.py  # provider settings editable from the Settings page
 │   ├── translation_cache.py # phrase-level cache in Redis
 │   ├── render.py            # painting translated text back onto images
 │   ├── progress.py          # task progress, published via Redis pub/sub
@@ -42,11 +43,14 @@ app/
     │   ├── service.py       #   orchestration, store access
     │   ├── transform.py     #   image transforms (rotate/straighten/crop)
     │   └── schemas.py
-    └── jp_translator/       # two-panel ja↔en translation with furigana
-        ├── router.py
-        ├── views.py
-        ├── service.py
-        └── schemas.py
+    ├── jp_translator/       # two-panel ja↔en translation with furigana
+    │   ├── router.py
+    │   ├── views.py
+    │   ├── service.py
+    │   └── schemas.py
+    └── settings/            # runtime provider config (translation, OCR)
+        ├── router.py        #   GET/PUT /api/settings (writes need password)
+        └── views.py         #   the /settings/ page
 ```
 
 ## Adding a tool
@@ -62,6 +66,11 @@ Heavy work goes through TaskIQ (`app/tasks/`), with progress published via
 
 - **Config**: pydantic-settings sections with env prefixes (`APP_`, `JR_`,
   `JPT_`, `TRANSLATION_`, `REDIS_URL`). `.env.example` documents all of them.
+  The Settings page (`app/tools/settings/`) stores runtime overrides for the
+  translation providers and the OCR engine in Redis (`app/core/
+  runtime_settings.py`); `.env` values are the bootstrap defaults, and a
+  saved override wins until cleared. Both web and worker read the same keys,
+  so a change lands on new jobs without a restart.
 - **Auth**: one shared `APP_PASSWORD` gates all writes; reads are open.
 - **Tests** live in `app/tests/` and run against the service layer and API;
   `uv run pytest -q`. Lint with `uv run ruff check app scripts`, types with

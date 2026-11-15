@@ -37,12 +37,17 @@ FROM base AS ocr-runtime
 # needs libGL. libgomp is the OpenMP runtime paddle's libpaddle.so loads —
 # it used to arrive as a side-effect of tesseract, so it is named here now.
 # fonts-noto-cjk is the CJK font the translated-page renderer falls back to.
+# tesseract (+ its Japanese models, horizontal and vertical) is the second
+# OCR engine — the self-hosted option selectable on the Settings page.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        fonts-noto-cjk \
        libgl1 \
        libglib2.0-0 \
        libgomp1 \
+       tesseract-ocr \
+       tesseract-ocr-jpn \
+       tesseract-ocr-jpn-vert \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------- models: the OCR weights, fetched once ----------
