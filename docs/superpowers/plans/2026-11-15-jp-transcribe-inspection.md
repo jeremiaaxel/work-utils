@@ -137,15 +137,15 @@ flagged, not in the transcribe pilot.
    follow-up: download to `app/static/models/`, gitignore + warm-up script).
 4. **kuromoji vs server pykakasi** — server call would leak text; local only.
 
-## Unresolved questions (for the user)
+## Resolved questions (answered 2026-11-15)
 
-1. **Target device for the first benchmark**: Linux desktop (Chromium/Firefox)
-   confirmed, or is the phone the priority? Determines whisper-base vs tiny
-   default.
-2. **iOS in scope?** Safari WASM works but WebGPU/SIMD paths and iOS speech
-   quirks (mediaSession, muted-tab throttling) need a device test day.
-3. **Part A encrypted save** — separate PR after Transcribe MVP, or same
-   series? Manifest order (§24) puts it before Transcribe; my reading: URL
-   removal + disclosure banner now, encrypted save as its own PR.
-4. **Model hosting**: CDN-pinned acceptable for the pilot (implies HF is a
-   visible third party in the ledger), or self-host from day one?
+1. **Target device**: desktop first → whisper-base (~85 MB) is the default
+   model; tiny stays available as the phone fallback option in the
+   readiness card.
+2. **iOS**: out of MVP scope — Linux desktop + Android only.
+3. **Part A scope**: privacy fixes now (URL removal, disclosure banner,
+   session-only + Clear session); encrypted IndexedDB save is its own
+   follow-up PR.
+4. **Model hosting**: CDN pinned to revision hashes for the pilot; HF shows
+   up in the connection ledger as a visible third party; self-host is the
+   §19 follow-up.
