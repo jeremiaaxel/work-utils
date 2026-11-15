@@ -61,6 +61,10 @@ FROM ocr-runtime AS models
 COPY --from=deps-worker /app/.venv /app/.venv
 COPY app/__init__.py app/__init__.py
 COPY app/core/__init__.py app/core/__init__.py
+# ocr.py reads the runtime OCR-engine override, so its import chain needs
+# runtime_settings (which pulls in config) too.
+COPY app/config.py app/config.py
+COPY app/core/runtime_settings.py app/core/runtime_settings.py
 COPY app/core/ocr.py app/core/ocr.py
 COPY app/warmup.py app/warmup.py
 

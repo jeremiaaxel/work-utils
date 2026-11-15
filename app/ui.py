@@ -54,6 +54,7 @@ _PAGES: dict[str, PageInfo] = {
         PageInfo("home", "Tools", "/", "Tools"),
         PageInfo("jp-reader", "JP Reader", "/jp-reader/", "JP Reader"),
         PageInfo("jp-translator", "JP Translator", "/jp-translator/", "JP Translator"),
+        PageInfo("transcribe", "Transcribe", "/transcribe/", "JP Transcribe"),
         PageInfo("settings", "Settings", "/settings/", "Settings"),
     )
 }

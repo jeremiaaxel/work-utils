@@ -45,6 +45,22 @@ def index():
                 ),
                 cls="card bg-base-200 shadow-xl",
             ),
+            Div(
+                Div(
+                    H2("JP Transcribe"),
+                    P(
+                        "Speak Japanese — see it transcribed with furigana "
+                        "and translated to English, entirely in your "
+                        "browser. Nothing leaves the device."
+                    ),
+                    Div(
+                        A("Open", href="/transcribe/", cls="btn btn-primary"),
+                        cls="card-actions justify-end",
+                    ),
+                    cls="card-body",
+                ),
+                cls="card bg-base-200 shadow-xl",
+            ),
             cls="grid grid-cols-1 md:grid-cols-2 gap-6",
         ),
     )

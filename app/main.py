@@ -17,6 +17,9 @@ from app.tools.jp_translator import (
 from app.tools.jp_translator.router import router as jp_translator_router
 from app.tools.settings import views as _settings_views  # noqa: F401 — registers routes
 from app.tools.settings.router import router as settings_router
+from app.tools.transcribe import (
+    views as _transcribe_views,  # noqa: F401 — registers routes
+)
 from app.ui import build_stamp
 
 logging.basicConfig(
