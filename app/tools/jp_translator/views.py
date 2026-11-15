@@ -80,7 +80,7 @@ _STYLES = """
 .jp-reading {
   color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
 }
-.jp-reading rt { font-size: 0.6em; }
+.jp-reading rt { font-size: 0.7em; }
 /* The translation sheet: slightly tinted, Google's right-hand panel. */
 .jp-result-surface {
   background: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-100));

@@ -201,7 +201,12 @@ def page(active: str, *content, title: str | None = None, wide: bool = False) ->
             Link(rel="stylesheet", href="https://cdn.jsdelivr.net/npm/daisyui@5"),
             Script(src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"),
             Script(src="https://unpkg.com/htmx.org@1.9.12"),
-            Style("rt { font-size: 0.5em; }"),
+            # Furigana: bigger than browser default, and a distinct colour
+            # so it reads as annotation at a glance, in both themes.
+            Style(
+                "rt { font-size: 0.62em; color: color-mix(in oklab, "
+                "var(--color-primary) 75%, var(--color-base-content)); }"
+            ),
             # Theme before first paint: the stored choice, else the OS
             # preference. Inline so a dark-mode visitor never sees a white
             # flash; theme.js only handles clicks after that.
