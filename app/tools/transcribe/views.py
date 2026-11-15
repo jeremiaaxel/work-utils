@@ -20,6 +20,7 @@ from fasthtml.common import (
     A,
     Button,
     Div,
+    NotStr,
     P,
     Script,
     Span,
@@ -191,6 +192,27 @@ def index():
             Div(id="tr-ledger-details", cls="hidden mt-2 text-xs opacity-70"),
             cls="alert py-2 text-sm mb-6",
             id="tr-ledger",
+        ),
+        # kuromoji is UMD only — load it classically so it sets
+        # window.kuromoji; the import map then adapts that global to a
+        # module default export.
+        Script(
+            src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js",
+        ),
+        # Module imports resolve here. transformers.js is pinned ESM from
+        # the CDN.
+        NotStr(
+            "<script type='importmap'>\n"
+            "{\n"
+            "  \"imports\": {\n"
+            "    \"@huggingface/transformers\": "
+            "\"https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.2"
+            "/dist/transformers.min.js\",\n"
+            "    \"kuromoji\": \"data:text/javascript,export default "
+            "window.kuromoji\"\n"
+            "  }\n"
+            "}\n"
+            "</script>"
         ),
         Script(src=asset_url("/transcribe/app.js"), type="module"),
     )

@@ -27,6 +27,7 @@ const PREROLL_MS = 250;        // audio before speech-start kept for context
 export async function initialize(progress) {
   return pipeline("audio-classification", "onnx-community/silero-vad", {
     dtype: "q8",
+    revision: "e71cae966052b992a7eca6b17738916ce0eca4ec",
     progress_callback: progress,
   });
 }
