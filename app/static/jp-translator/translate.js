@@ -18,37 +18,10 @@
 
   var panels = {};
 
-  // ── URL state (shareable, Google-translate style) ──────────────
-
-  // Each panel owns one query parameter: understand -> ja, express -> en.
-  // replaceState keeps typing from flooding the history.
-  var URL_PARAMS = { "jp-understand": "ja", "jp-express": "en" };
-
-  function saveToUrl(panel) {
-    try {
-      var params = new URLSearchParams(window.location.search);
-      var key = URL_PARAMS[panel.id];
-      var value = panel.input.value.trim();
-      if (value) { params.set(key, value); }
-      else { params.delete(key); }
-      var query = params.toString();
-      window.history.replaceState(
-        null, "", window.location.pathname + (query ? "?" + query : "")
-      );
-    } catch (e) { /* sandboxed or no history API — text still works */ }
-  }
-
-  function restoreFromUrl(panel) {
-    try {
-      var params = new URLSearchParams(window.location.search);
-      var value = params.get(URL_PARAMS[panel.id]);
-      if (value) {
-        panel.input.value = value;
-        return true;
-      }
-    } catch (e) { /* no URLSearchParams — skip */ }
-    return false;
-  }
+  // ── URL state: none ─────────────────────────────────────────────
+  // Text never goes into the URL. Translations can be confidential, and a
+  // query string leaks into history bars, referrer headers and screenshots.
+  // Nothing here is shareable by design (the manifest pins this).
 
   // ── helpers ────────────────────────────────────────────────────
 
@@ -307,7 +280,6 @@
       clearError(panel);
       resetResult(panel);
       setBusy(panel, false);
-      saveToUrl(panel);
       return;
     }
     if (!password()) {
@@ -347,7 +319,6 @@
       if (!data || requestId !== panel.requestId) { return; }
       panel.submitted = text;
       display(panel, data);
-      saveToUrl(panel);
     }).catch(function (err) {
       if (requestId !== panel.requestId) { return; }
       showError(panel, err.message || "Translation failed");
@@ -480,7 +451,6 @@
     panel.clear.classList.add("hidden");
     clearError(panel);
     resetResult(panel);
-    saveToUrl(panel);
   }
 
   // ── wiring ─────────────────────────────────────────────────────
@@ -591,15 +561,6 @@
   wirePanel("jp-understand", "ja_en");
   wirePanel("jp-express", "en_ja");
   restorePassword();
-
-  // Shared text in the URL (?ja=…&en=…) is filled in and translated at
-  // once — that is the point of a shareable link.
-  Object.keys(panels).forEach(function (id) {
-    if (restoreFromUrl(panels[id])) {
-      panels[id].clear.classList.remove("hidden");
-      translate(panels[id]);
-    }
-  });
 
   var passwordField = $("jp-password");
   if (passwordField) {
