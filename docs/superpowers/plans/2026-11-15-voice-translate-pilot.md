@@ -1,6 +1,10 @@
 # Voice Translate Pilot — near-real-time ja→en speech translation
 
-> **STATUS: DRAFT** — brainstorm / pilot design. Inspired by PocketTalk web.
+> **STATUS: SUPERSEDED IN PART** — the `jp-transcribe` manifest (repo root)
+> requires **browser-local** inference and forbids server audio endpoints
+> (Part C). The engine/transport choices below (server-side whisper,
+> segment POST) are overridden; the privacy section stands. Full rewrite
+> pending.
 > Primary direction: Japanese → English. Fits the existing work-utils stack
 > (FastAPI + FastHTML + Redis + TaskIQ, single VPS behind Caddy).
 
@@ -132,6 +136,95 @@ streaming STT providers behind the same registry.
   (Caddy TLS ✓) and a user gesture (start button ✓); test on iOS early.
 - **A 500 MB model download** on first deploy — do it in warm-up, not first
   utterance; volume-mounted so restarts don't re-download.
+
+## Confidentiality: make it local, then *prove* it on-screen
+
+The `jp-transcribe` manifest sets hard constraints the pilot design above
+violates: inference must be **browser-local** (Part B §12–14), no server
+audio endpoints, WebSockets, or server models (Part C §16), no silent cloud
+fallback, session-only content, and a demonstration package that shows the
+claims are true (Part D §20). Revised design:
+
+**Engine path (replaces server-side faster-whisper):** whisper in the
+browser. Select one tested path, not several:
+
+| Path | Runtime | ja quality | Cost | Notes |
+|---|---|---|---|---|
+| **transformers.js / ONNX Runtime Web + whisper-tiny/small (ONNX)** ← pick | WASM/WebGPU | usable (tiny) → good (small) | free, Apache/MIT models | pure JS, no native build, works CPU-only; WebGPU accelerates where present |
+| whisper.cpp → WASM (e.g. `@xenova/whisper.cpp` style bindings) | WASM/SIMD | good | free | heavier integration, no WebGPU; strong CPU path |
+| Web Speech API | browser-internal | varies | free | **rejected**: Chrome's implementation calls Google servers — not local, unverifiable |
+
+CPU fallback is mandatory (manifest §12: report limitations, don't silently
+go remote); WebGPU is an accelerator, not a requirement.
+
+**Local translation:** the manifest's `Translator` interface needs a
+browser-local ja→en model — evaluate a small NMT (e.g. Opus-MT ja-en via
+transformers.js, ~80 MB) against quality requirements; if quality fails,
+report the limitation rather than falling back to `core/translate.py`
+(which is a remote provider — that's the "no silent cloud fallback" line).
+
+**Furigana:** the server's pykakasi path is off-limits in local mode (it
+would send text). Evaluate kuromoji.js + a kana converter, or include
+readings via the local model tokenizer where feasible. Furigana must never
+block transcription display (§15).
+
+**Interface seam (§17):** browser-side `Transcriber` / `Translator` /
+`ReadingAnnotator` objects with `initialize() / transcribe() / translate() /
+dispose()` — stable segment IDs, provisional vs final results, so a future
+remote backend could emit the same events. Session orchestration stays
+separate from model implementation. No WS, no server worker changes in this
+build; Part C stays documentation-only.
+
+**Trust UX — show, don't just claim:** privacy that the user can't see might
+as well not exist, so make the confidentiality state a first-class UI
+element, backed by evidence:
+
+- **Processing badge, always visible while recording** — a persistent
+  status chip: `⏺ On this device — audio & text never leave this browser`,
+  green while local-ready, amber/grey when models aren't loaded. It must be
+  derivable from actual state (models initialized, VAD running), not a
+  static string — a lie in a badge is worse than no badge.
+- **Mode banner distinguishes what's real:** `Processing: On this device /
+  Processing: Remote translation provider` (§5 wording) — if the
+  translation step uses the server registry, say remote; never label remote
+  processing as local.
+- **Pre-flight readiness card** (§13): before Start, show model names +
+  sizes, download progress, then the distinction *Downloaded → Cached →
+  In memory → Ready*, plus a **Test mic & inference** step that runs one
+  round-trip locally and displays the result before enabling Start.
+- **Network evidence, in-page:** a DevTools-free "connection ledger" —
+  during a session the page itself tallies its own outbound requests
+  (via PerformanceObserver on resource entries, own-origin only) and shows
+  `Outbound requests this session: N — model assets only` with a drill-down
+  of asset URLs. Honest scope: the page can't see OS-level traffic, so the
+  copy says *this page made N requests, none carrying audio or transcript
+  text* — which the code review + §20 network capture (Wireshark/
+  browser devtools HAR in the demo package) independently verify.
+- **Recording indicator:** the explicit Start/Stop plus a visible
+  red recording dot while the mic is open (getUserMedia active), and Pause
+  that visibly suspends VAD. TTS/pronunciation playback stays off by
+  default (§15).
+- **Session-only by construction:** transcript lives in JS memory; Clear
+  session wipes it; refresh loses it (state that in the UI once, §4.5).
+  Nothing about the transcript goes to Redis, the jr_store, logs, or URLs —
+  the server never sees it, so there's nothing to persist.
+
+**Honesty discipline:** every claim maps to an artifact — badge ↔ engine
+state; ledger ↔ PerformanceObserver + HAR capture in the demo package;
+"On this device" ↔ verified network capture (§20). The demo package also
+needs the offline test (airplane mode after init → transcription still
+works), storage inspection (no transcript in IndexedDB/localStorage), and
+log inspection. Disclose the real limits: delivered JS is trusted code,
+extensions/device compromise out of scope, model quality varies (§21).
+
+**What this changes in the plan:** P0 becomes browser-local — no
+`app/core/stt.py`, no `/api/voice/segments`, no faster-whisper dep; the web
+container only serves static JS + model assets (self-host models where
+feasible, CSP-restricted, §19). P1 carries the JP Translate privacy work
+(Part A: session-only defaults, explicit encrypted save) and the evidence
+package. Server-side whisper is demoted to the documented future mode
+(Part C §18) — implemented only as an explicit, warned, non-default
+selection, never a fallback.
 
 ## Decision record
 
